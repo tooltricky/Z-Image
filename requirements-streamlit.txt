@@ -1,0 +1,5 @@
+# Additional requirements for Z-Image Streamlit Web Interface
+# Install the base Z-Image requirements first: pip install -e .
+# Then install these additional requirements: pip install -r requirements-streamlit.txt
+
+streamlit>=1.28.0
