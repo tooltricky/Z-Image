@@ -1,4 +1,4 @@
-"""Z-Image Streamlit Web Interface - A user-friendly GUI for image generation."""
+"""Z-Image Streamlit Web 界面 - 用户友好的图像生成 GUI。"""
 
 import time
 import warnings
@@ -13,10 +13,15 @@ from utils import load_from_local_dir, set_attention_backend
 from zimage import generate
 
 
+def adjust_to_multiple_of_16(value):
+    """调整数值为16的倍数（四舍五入到最接近的倍数）"""
+    return round(value / 16) * 16
+
+
 @st.cache_resource
 def load_model(model_path, device, dtype, compile_model):
-    """Load Z-Image model with caching to avoid reloading."""
-    with st.spinner("Loading Z-Image model... This may take a few minutes on first load."):
+    """加载 Z-Image 模型，使用缓存避免重复加载。"""
+    with st.spinner("正在加载 Z-Image 模型... 首次加载可能需要几分钟。"):
         components = load_from_local_dir(
             model_path,
             device=device,
@@ -28,7 +33,7 @@ def load_model(model_path, device, dtype, compile_model):
 
 
 def generate_image(components, prompt, height, width, num_steps, guidance, seed, device):
-    """Generate image using Z-Image model."""
+    """使用 Z-Image 模型生成图像。"""
     generator = torch.Generator(device).manual_seed(seed)
 
     start_time = time.time()
@@ -47,41 +52,41 @@ def generate_image(components, prompt, height, width, num_steps, guidance, seed,
 
 
 def main():
-    # Page configuration
+    # 页面配置
     st.set_page_config(
-        page_title="Z-Image Generator",
+        page_title="Z-Image 图像生成器",
         page_icon="⚡",
         layout="wide",
         initial_sidebar_state="expanded"
     )
 
-    # Main title
-    st.title("⚡ Z-Image Generator")
-    st.markdown("**An Efficient Image Generation Foundation Model with Single-Stream Diffusion Transformer**")
+    # 主标题
+    st.title("⚡ Z-Image 图像生成器")
+    st.markdown("**基于单流扩散 Transformer 的高效图像生成基础模型**")
     st.markdown("---")
 
-    # Sidebar - Model Configuration
+    # 侧边栏 - 模型配置
     with st.sidebar:
-        st.header("⚙️ Model Configuration")
+        st.header("⚙️ 模型配置")
 
         model_path = st.text_input(
-            "Model Path",
+            "模型路径",
             value="ckpts/Z-Image-Turbo",
-            help="Path to the Z-Image model directory"
+            help="Z-Image 模型目录的路径"
         )
 
         device = st.selectbox(
-            "Device",
+            "计算设备",
             options=["cuda", "cpu"],
             index=0,
-            help="Select compute device (CUDA recommended for speed)"
+            help="选择计算设备（推荐使用 CUDA 以获得更快速度）"
         )
 
         dtype_option = st.selectbox(
-            "Data Type",
+            "数据类型",
             options=["bfloat16", "float16", "float32"],
             index=0,
-            help="Model precision (bfloat16 recommended)"
+            help="模型精度（推荐 bfloat16）"
         )
 
         dtype_map = {
@@ -92,164 +97,172 @@ def main():
         dtype = dtype_map[dtype_option]
 
         compile_model = st.checkbox(
-            "Compile Model",
+            "编译模型",
             value=False,
-            help="Enable model compilation for faster inference (first run will be slower)"
+            help="启用模型编译以加快推理速度（首次运行会较慢）"
         )
 
         st.markdown("---")
-        st.header("🎨 Generation Parameters")
+        st.header("🎨 生成参数")
 
-        # Image dimensions
+        # 图像尺寸
         col1, col2 = st.columns(2)
         with col1:
-            height = st.number_input(
-                "Height",
+            height_input = st.number_input(
+                "高度",
                 min_value=512,
                 max_value=2048,
                 value=1024,
-                step=64,
-                help="Output image height"
+                step=16,
+                help="输出图像高度（将自动调整为16的倍数）"
             )
 
         with col2:
-            width = st.number_input(
-                "Width",
+            width_input = st.number_input(
+                "宽度",
                 min_value=512,
                 max_value=2048,
                 value=1024,
-                step=64,
-                help="Output image width"
+                step=16,
+                help="输出图像宽度（将自动调整为16的倍数）"
             )
 
-        # Inference parameters
+        # 自动调整为16的倍数
+        height = adjust_to_multiple_of_16(height_input)
+        width = adjust_to_multiple_of_16(width_input)
+
+        # 如果调整后的值与输入不同，显示提示
+        if height != height_input or width != width_input:
+            st.info(f"💡 尺寸已自动调整为 {height} × {width}（16的倍数）")
+
+        # 推理参数
         num_inference_steps = st.slider(
-            "Inference Steps",
+            "推理步数",
             min_value=1,
             max_value=50,
             value=8,
-            help="Number of denoising steps (8 recommended for Turbo model)"
+            help="去噪步数（Turbo 模型推荐 8）"
         )
 
         guidance_scale = st.slider(
-            "Guidance Scale",
+            "引导系数",
             min_value=0.0,
             max_value=10.0,
             value=0.0,
             step=0.1,
-            help="Classifier-free guidance scale (0.0 recommended for Turbo model)"
+            help="分类器自由引导系数（Turbo 模型推荐 0.0）"
         )
 
         seed = st.number_input(
-            "Random Seed",
+            "随机种子",
             min_value=0,
             max_value=2147483647,
             value=42,
-            help="Random seed for reproducibility"
+            help="用于可重现性的随机种子"
         )
 
         st.markdown("---")
-        st.info("💡 **Tip**: For best speed with Hopper GPUs (H100/H800), enable model compilation and use Flash Attention.")
+        st.info("💡 **提示**：使用 Hopper GPU（H100/H800）时，启用模型编译并使用 Flash Attention 可获得最佳速度。")
 
-    # Main content area
+    # 主内容区域
     col_left, col_right = st.columns([1, 1])
 
     with col_left:
-        st.header("📝 Prompt Input")
+        st.header("📝 提示词输入")
 
-        # Example prompts
+        # 示例提示词
         example_prompts = {
-            "Chinese Woman in Hanfu": (
+            "汉服女子": (
                 "Young Chinese woman in red Hanfu, intricate embroidery. Impeccable makeup, red floral forehead pattern. "
                 "Elaborate high bun, golden phoenix headdress, red flowers, beads. Holds round folding fan with lady, trees, bird. "
                 "Neon lightning-bolt lamp (⚡️), bright yellow glow, above extended left palm. Soft-lit outdoor night background, "
                 "silhouetted tiered pagoda (西安大雁塔), blurred colorful distant lights."
             ),
-            "Photorealistic Portrait": "A photorealistic portrait of a young woman with natural lighting, professional photography, high detail, 8k resolution",
-            "Fantasy Landscape": "A magical fantasy landscape with floating islands, waterfalls, mystical fog, and vibrant colors, digital art masterpiece",
-            "Custom": ""
+            "写实人像": "一位年轻女性的写实肖像，自然光线，专业摄影，高细节，8k分辨率",
+            "奇幻风景": "一个神奇的奇幻风景，漂浮的岛屿，瀑布，神秘迷雾，充满活力的色彩，数字艺术杰作",
+            "自定义": ""
         }
 
         selected_example = st.selectbox(
-            "Example Prompts",
+            "示例提示词",
             options=list(example_prompts.keys()),
             index=0,
-            help="Select an example prompt or choose 'Custom' to write your own"
+            help="选择一个示例提示词或选择"自定义"来编写您自己的提示词"
         )
 
-        if selected_example == "Custom":
+        if selected_example == "自定义":
             prompt = st.text_area(
-                "Enter your prompt",
+                "输入您的提示词",
                 value="",
                 height=200,
-                placeholder="Describe the image you want to generate in detail...",
-                help="Provide a detailed description of the image you want to create"
+                placeholder="详细描述您想要生成的图像...",
+                help="提供您想要创建的图像的详细描述"
             )
         else:
             prompt = st.text_area(
-                "Prompt",
+                "提示词",
                 value=example_prompts[selected_example],
                 height=200,
-                help="Edit the prompt or select 'Custom' to start fresh"
+                help="编辑提示词或选择"自定义"重新开始"
             )
 
-        # Generate button
+        # 生成按钮
         generate_button = st.button(
-            "🎨 Generate Image",
+            "🎨 生成图像",
             type="primary",
             use_container_width=True,
             disabled=not prompt.strip()
         )
 
         if not prompt.strip():
-            st.warning("⚠️ Please enter a prompt to generate an image.")
+            st.warning("⚠️ 请输入提示词以生成图像。")
 
     with col_right:
-        st.header("🖼️ Generated Image")
+        st.header("🖼️ 生成的图像")
 
-        # Image display area
+        # 图像显示区域
         image_placeholder = st.empty()
         info_placeholder = st.empty()
         download_placeholder = st.empty()
 
-        # Initialize session state for storing generated image
+        # 初始化 session state 用于存储生成的图像
         if 'generated_image' not in st.session_state:
             st.session_state.generated_image = None
             st.session_state.generation_time = None
 
-        # Display existing image if available
+        # 如果有可用的图像，则显示
         if st.session_state.generated_image is not None:
             image_placeholder.image(
                 st.session_state.generated_image,
-                caption="Generated Image",
+                caption="生成的图像",
                 use_container_width=True
             )
             info_placeholder.success(
-                f"✅ Image generated in {st.session_state.generation_time:.2f} seconds"
+                f"✅ 图像在 {st.session_state.generation_time:.2f} 秒内生成完成"
             )
 
-            # Download button
+            # 下载按钮
             buf = BytesIO()
             st.session_state.generated_image.save(buf, format="PNG")
             download_placeholder.download_button(
-                label="⬇️ Download Image",
+                label="⬇️ 下载图像",
                 data=buf.getvalue(),
                 file_name=f"zimage_output_{int(time.time())}.png",
                 mime="image/png",
                 use_container_width=True
             )
         else:
-            image_placeholder.info("👈 Enter a prompt and click 'Generate Image' to start")
+            image_placeholder.info("👈 输入提示词并点击"生成图像"开始")
 
-    # Generate image when button is clicked
+    # 点击按钮时生成图像
     if generate_button:
         if prompt.strip():
             try:
-                # Load model
+                # 加载模型
                 components = load_model(model_path, device, dtype, compile_model)
 
-                # Generate image
-                with st.spinner("🎨 Generating image... Please wait..."):
+                # 生成图像
+                with st.spinner("🎨 正在生成图像... 请稍候..."):
                     image, gen_time = generate_image(
                         components=components,
                         prompt=prompt,
@@ -261,25 +274,25 @@ def main():
                         device=device
                     )
 
-                # Store in session state
+                # 存储到 session state
                 st.session_state.generated_image = image
                 st.session_state.generation_time = gen_time
 
-                # Display the image
+                # 显示图像
                 image_placeholder.image(
                     image,
-                    caption="Generated Image",
+                    caption="生成的图像",
                     use_container_width=True
                 )
                 info_placeholder.success(
-                    f"✅ Image generated successfully in {gen_time:.2f} seconds!"
+                    f"✅ 图像生成成功！耗时 {gen_time:.2f} 秒"
                 )
 
-                # Download button
+                # 下载按钮
                 buf = BytesIO()
                 image.save(buf, format="PNG")
                 download_placeholder.download_button(
-                    label="⬇️ Download Image",
+                    label="⬇️ 下载图像",
                     data=buf.getvalue(),
                     file_name=f"zimage_output_{int(time.time())}.png",
                     mime="image/png",
@@ -287,17 +300,17 @@ def main():
                 )
 
             except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
+                st.error(f"❌ 错误：{str(e)}")
                 st.exception(e)
 
-    # Footer
+    # 页脚
     st.markdown("---")
     st.markdown(
         """
         <div style='text-align: center; color: #666;'>
-        <p>Powered by <strong>Z-Image</strong> - Tongyi-MAI |
+        <p>由 <strong>Z-Image</strong> 驱动 - 通义·模型AI |
         <a href='https://github.com/Tongyi-MAI/Z-Image' target='_blank'>GitHub</a> |
-        <a href='https://arxiv.org/abs/2511.22699' target='_blank'>Paper</a></p>
+        <a href='https://arxiv.org/abs/2511.22699' target='_blank'>论文</a></p>
         </div>
         """,
         unsafe_allow_html=True
